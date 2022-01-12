@@ -63,11 +63,14 @@ class ProcessCreator {
 class compare_FCFS {
     public:
     bool operator() (Process *A, Process *B) {
-        if ( A->arrival_time > B->arrival_time ) return true;
-        else if ( A->arrival_time == B->arrival_time )  {
-            return A->pid > B->pid;
-        }
-        return false;
+        return A->arrival_time > B->arrival_time;
+    }
+};
+
+class compare_SJF {
+    public:
+    bool operator() (Process *A, Process *B) {
+        return A->burst_time > B->burst_time;
     }
 };
 
@@ -135,21 +138,98 @@ class Simulator{
             }
             f.close();
 
-            // int i = 1;
-            // while (i<=simulation_time) {
-            //     cout << "After " << i << " ms, \n";
-            //     i++;
+            generate_report(process_list, num_process);
+        }
 
-            //     // Also print the status in status.txt after each meaning full iteration
-            // }
+        else if ( scheduling_algo == 's' ) {
+            // Shortest Job First
+
+            priority_queue<Process*, vector<Process*>, compare_SJF> ready_queue;
+            for (int i=0 ; i<num_process ; i++)
+                ready_queue.push( process_list[i] );
+
+            ofstream f;
+            f.open("status.txt");
+            int i = 0;
+            while (!ready_queue.empty())    {
+                Process *t = ready_queue.top();
+                // t->print_info();
+
+                if ( t->arrival_time >= i ) {
+                    i = t->arrival_time;
+                    t->response_time = 0;
+                }
+                else t->response_time = i - t->arrival_time;
+
+                f << "Process with pid: " << t->pid << ", " << " arrived at " << t->arrival_time << "\n";
+                f << "Process with pid: " << t->pid << ", " << " executing at " << i << "\n";
+                i += t->burst_time;
+                f << "Process with pid: " << t->pid << ", " << " exited at " << i << "\n";
+                t->completion_time = i;
+                t->tot_turn_around_time = t->completion_time - t->arrival_time;
+                t->waiting_time = t->tot_turn_around_time - t->burst_time;
+
+                ready_queue.pop();
+            }
+            f.close();
 
             generate_report(process_list, num_process);
         }
+
+        else if ( scheduling_algo == 'r' ) {
+            // Round Robin
+
+            priority_queue<Process*, vector<Process*>, compare_FCFS> temp;
+            for (int i=0 ; i<num_process ; i++)
+                temp.push( process_list[i] );
+
+            queue<Process *> ready_queue;
+            while (!temp.empty())   {
+                ready_queue.push( temp.top() );
+                temp.pop();
+            }
+            
+            ofstream f;
+            f.open("status.txt");
+            int i = 0;
+            while (!ready_queue.empty())    {
+                Process *t = ready_queue.front();
+                ready_queue.pop();
+                // t->print_info();
+
+                if ( t->arrival_time >= i ) {
+                    i = t->arrival_time;
+                    t->response_time = 0;
+                }
+                else t->response_time = i - t->arrival_time;
+
+                f << "Process with pid: " << t->pid << ", " << " arrived at " << t->arrival_time << "\n";
+                f << "Process with pid: " << t->pid << ", " << " executing at " << i << "\n";
+
+                if ( t->burst_time > time_quantum ) {
+                    i += time_quantum;
+                    t->burst_time -= time_quantum;
+                    ready_queue.push(t);
+                }
+                else {
+                    i += t->burst_time;
+                    f << "Process with pid: " << t->pid << ", " << " exited at " << i << "\n";
+                    t->completion_time = i;
+                    t->tot_turn_around_time = t->completion_time - t->arrival_time;
+                    t->waiting_time = t->tot_turn_around_time - t->burst_time;
+                }                
+            }
+            f.close();
+
+            generate_report(process_list, num_process);
+        }
+
+        else cout << "Not a valid scheduling algo.\n";
     }
 
     void generate_report (Process **process_list, int size) {
         // generating the TAT, WT, RT table
-        cout << "SIZE = " << size << "\n";
+        // cout << "SIZE = " << size << "\n";
 
         ofstream f;
         f.open ("result.txt");
@@ -167,10 +247,20 @@ class Simulator{
 int Process::process_count = 0;
 
 int main () {
-    Simulator s(1, 'f', -1, 40);
-    s.start();
-
-    // ProcessCreator pc(1000);
-    // Process **arr = pc.create();
-    // pc.print_process_list();
+    cout << "Enter simulation time(in seconds): ";
+    int sim_time; cin >> sim_time;
+    cout << "Enter the type of scheduling algo that you would like to simulate: ";
+    cout << "Options: \n\t'f' -> FCFS\n\t's' -> SJF\n\t'r' -> RR\n<-";
+    char input; cin >> input;
+    if ( input == 'f' or input == 's'){
+        Simulator s(sim_time, input);
+        s.start();
+    }
+    else if (input == 'r') {
+        cout << "Enter the time quantum(in ms): ";
+        int tq; cin >> tq;
+        Simulator s(sim_time, input, tq);
+        s.start();
+    }    
+    return 0;
 }
