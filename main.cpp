@@ -1,5 +1,6 @@
 #include<iostream>
 #include<queue>
+#include <fstream>
 using namespace std;
 
 class Process {
@@ -50,7 +51,7 @@ class ProcessCreator {
     }
 
     void print_process_list () {
-        for (int i=0 ; i<20 ; i++)
+        for (int i=0 ; i<num_process ; i++)
             process_list[i]->print_info();
     }
 
@@ -61,10 +62,10 @@ class ProcessCreator {
 
 class compare_FCFS {
     public:
-    bool operator() (Process &A, Process &B) {
-        if ( A.arrival_time > B.arrival_time ) return true;
-        else if ( A.arrival_time == B.arrival_time )  {
-            return A.pid > B.pid;
+    bool operator() (Process *A, Process *B) {
+        if ( A->arrival_time > B->arrival_time ) return true;
+        else if ( A->arrival_time == B->arrival_time )  {
+            return A->pid > B->pid;
         }
         return false;
     }
@@ -106,22 +107,33 @@ class Simulator{
         if ( scheduling_algo == 'f' ) {
             // First come first serve
 
-            priority_queue<Process, vector<Process>, compare_FCFS> ready_queue;
+            priority_queue<Process*, vector<Process*>, compare_FCFS> ready_queue;
             for (int i=0 ; i<num_process ; i++)
-                ready_queue.push( *process_list[i] );
+                ready_queue.push( process_list[i] );
 
+            ofstream f;
+            f.open("status.txt");
             int i = 0;
             while (!ready_queue.empty())    {
-                Process t = ready_queue.top();
-                t.print_info();
+                Process *t = ready_queue.top();
 
+                if ( t->arrival_time >= i ) {
+                    i = t->arrival_time;
+                    t->response_time = 0;
+                }
+                else t->response_time = i - t->arrival_time;
 
-                i = t.arrival_time;
-                
+                f << "Process with pid: " << t->pid << ", " << " arrived at " << t->arrival_time << "\n";
+                f << "Process with pid: " << t->pid << ", " << " executing at " << i << "\n";
+                i += t->burst_time;
+                f << "Process with pid: " << t->pid << ", " << " exited at " << i << "\n";
+                t->completion_time = i;
+                t->tot_turn_around_time = t->completion_time - t->arrival_time;
+                t->waiting_time = t->tot_turn_around_time - t->burst_time;
 
                 ready_queue.pop();
             }
-            
+            f.close();
 
             // int i = 1;
             // while (i<=simulation_time) {
@@ -130,22 +142,32 @@ class Simulator{
 
             //     // Also print the status in status.txt after each meaning full iteration
             // }
+
+            generate_report(process_list, num_process);
         }
     }
 
-    void generate_report () {
+    void generate_report (Process **process_list, int size) {
         // generating the TAT, WT, RT table
-    }
+        cout << "SIZE = " << size << "\n";
 
-    ~Simulator() {
-        cout << "Generated the status.txt file";
+        ofstream f;
+        f.open ("result.txt");
+        f << "pid\t|\tAT\t|\tBT\t|\tCT\t|\tTAT\t|\tWT\t|\tRT\n";
+        f << "___________________________________________________\n";
+        for (int i=0 ; i<size ; i++) 
+            f << process_list[i]->pid << "\t|\t" << process_list[i]->arrival_time << "\t|\t" 
+            << process_list[i]->burst_time << "\t|\t" << process_list[i]->completion_time 
+            << "\t|\t" << process_list[i]->tot_turn_around_time << "\t|\t" 
+            << process_list[i]->waiting_time << "\t|\t" << process_list[i]->response_time << "\n";
+        f.close();
     }
 };
 
 int Process::process_count = 0;
 
 int main () {
-    Simulator s(1, 'f');
+    Simulator s(1, 'f', -1, 40);
     s.start();
 
     // ProcessCreator pc(1000);
